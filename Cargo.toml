@@ -14,7 +14,6 @@ authors = ["Miyoshi-Ryota <m1yosh1.ry0t4@gmail.com>"]
 
 [dependencies]
 russh = "0.50.4"
-russh-sftp = "2.0.8"
 thiserror = "1.0"
 tokio = { version = "1", features = ["fs"] }
 

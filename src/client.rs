@@ -4,7 +4,6 @@ use russh::{
     client::{Config, Handle, Handler, Msg},
     Channel,
 };
-use russh_sftp::{client::SftpSession, protocol::OpenFlags};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::{fmt::Debug, path::Path};
@@ -413,46 +412,6 @@ impl Client {
         }
 
         return Err(connect_err);
-    }
-
-    /// Upload a file with sftp to the remote server.
-    ///
-    /// `src_file_path` is the path to the file on the local machine.
-    /// `dest_file_path` is the path to the file on the remote machine.
-    /// Some sshd_config does not enable sftp by default, so make sure it is enabled.
-    /// A config line like a `Subsystem sftp internal-sftp` or
-    /// `Subsystem sftp /usr/lib/openssh/sftp-server` is needed in the sshd_config in remote machine.
-    pub async fn upload_file<T: AsRef<Path>, U: Into<String>>(
-        &self,
-        src_file_path: T,
-        //fa993: This cannot be AsRef<Path> because of underlying lib constraints as described here
-        //https://github.com/AspectUnk/russh-sftp/issues/7#issuecomment-1738355245
-        dest_file_path: U,
-    ) -> Result<(), crate::Error> {
-        // start sftp session
-        let channel = self.get_channel().await?;
-        channel.request_subsystem(true, "sftp").await?;
-        let sftp = SftpSession::new(channel.into_stream()).await?;
-
-        // read file contents locally
-        let file_contents = tokio::fs::read(src_file_path)
-            .await
-            .map_err(crate::Error::IoError)?;
-
-        // interaction with i/o
-        let mut file = sftp
-            .open_with_flags(
-                dest_file_path,
-                OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE | OpenFlags::READ,
-            )
-            .await?;
-        file.write_all(&file_contents)
-            .await
-            .map_err(crate::Error::IoError)?;
-        file.flush().await.map_err(crate::Error::IoError)?;
-        file.shutdown().await.map_err(crate::Error::IoError)?;
-
-        Ok(())
     }
 
     /// Execute a remote command via the ssh connection.
@@ -1050,16 +1009,5 @@ ASYNC_SSH2_TEST_UPLOAD_FILE
 
         assert_eq!(result1.stdout, "test clone\n");
         assert_eq!(result2.stdout, "test clone2\n");
-    }
-
-    #[tokio::test]
-    async fn client_can_upload_file() {
-        let client = establish_test_host_connection().await;
-        let _ = client
-            .upload_file(&env("ASYNC_SSH2_TEST_UPLOAD_FILE"), "/tmp/uploaded")
-            .await
-            .unwrap();
-        let result = client.execute("cat /tmp/uploaded").await.unwrap();
-        assert_eq!(result.stdout, "this is a test file\n");
     }
 }

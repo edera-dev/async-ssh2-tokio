@@ -29,8 +29,6 @@ pub enum Error {
     SendError(#[from] russh::SendError),
     #[error("Agent auth error")]
     AgentAuthError(#[from] russh::AgentAuthError),
-    #[error("SFTP error occured: {0}")]
-    SftpError(#[from] russh_sftp::client::error::Error),
     #[error("I/O error")]
     IoError(#[from] io::Error),
 }
